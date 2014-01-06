@@ -1,0 +1,246 @@
+from collections import defaultdict
+from random import uniform
+from math import sqrt
+# additional imports
+import numpy as np
+import random
+import sys
+import csv
+
+# error messages
+def error_msg(txt):
+    ''' Printing error messages.
+    
+    args:
+        txt: String containing error message
+    '''
+    sys.stderr.write("An error occured: \n-> %s\n" % txt)
+    sys.exit(1)
+
+def point_avg(points):
+    """
+    Accepts a list of points, each with the same number of dimensions.
+    NB. points can have more dimensions than 2
+    
+    Returns a new point which is the center of all the points.
+    """
+    dimensions = len(points[0])
+
+    new_center = []
+
+    for dimension in xrange(dimensions):
+        dim_sum = 0  # dimension sum
+        for p in points:
+            dim_sum += p[dimension]
+
+        # average of each dimension
+        new_center.append(dim_sum / float(len(points)))
+
+    return new_center
+
+
+def update_centers(data_set, assignments):
+    """
+    Accepts a dataset and a list of assignments; the indexes 
+    of both lists correspond to each other.
+
+    Compute the center for each of the assigned groups.
+
+    Return `k` centers where `k` is the number of unique assignments.
+    """
+    new_means = defaultdict(list)
+    centers = []
+    for assignment, point in zip(assignments, data_set):
+        new_means[assignment].append(point)
+        
+    for points in new_means.itervalues():
+        centers.append(point_avg(points))
+
+    return centers
+
+def assign_points(data_points, centers):
+    """
+    Given a data set and a list of points betweeen other points,
+    assign each point to an index that corresponds to the index
+    of the center point on it's proximity to that point. 
+    Return a an array of indexes of centers that correspond to
+    an index in the data set; that is, if there are N points
+    in `data_set` the list we return will have N elements. Also
+    If there are Y points in `centers` there will be Y unique
+    possible values within the returned list.
+    """
+    assignments = []
+    for point in data_points:
+        shortest = ()  # positive infinity
+        shortest_index = 0
+        for i in xrange(len(centers)):
+            val = distance(point, centers[i])
+            if val < shortest:
+                shortest = val
+                shortest_index = i
+        assignments.append(shortest_index)
+    return assignments
+
+# distance measure
+def distance(a, b):
+	'''
+        Distance measure to be used
+	in this case: Euclidean Distance
+
+	args:
+            a, b: points for which the distance should be measured
+	'''
+	x = np.array(a)
+	y = np.array(b)
+	dist = np.linalg.norm(x-y)
+	return dist
+
+
+# initializing centers
+def generate_k(data_set, k):
+    """
+    Given `data_set`, which is an array of arrays,
+    find the minimum and maximum for each coordinate, a range.
+    Generate `k` random points between the ranges.
+    Return an array of the random points within the ranges.
+    """
+    # error if k is higher than the length of the data
+    if(k > len(data)):
+        error_msg("In 'generate_k':: k is higher than the length of the data")
+
+    centers=[]
+    while (len(centers)<k):
+        # chooses a random point from the data
+        center = data[random.randint(0,len(data)-1)]
+        # tests if the point has already been chosen as a center before adding it to centers
+        if( not(center in centers) ):
+            centers.append(center)
+            return centers
+        
+# optimized initialization using kmeans++
+def generate_k_plus(data_set, k):
+    """
+    same role as 'generate_k' function,
+    but uses the kmeans++ algorithm
+    """
+    N = len(data)
+
+    # error if k is higher than the length of the data
+    if(k > N):
+        error_msg("In 'generate_k_plus':: k is higher than the length of the data")
+        
+    centers = []
+    
+    # choosing a center uniformly at random among the data set
+    first_center = data[random.randint(0, N-1)]
+    centers.append(first_center)
+
+    # repeat until k centers have been chosen
+    while(len(centers)<k):
+		# store, for each point x, the SQUARE of the distance d(x) to the nearest center
+		d = {}
+		p_range = {}
+		cumsum = 0
+		for i in xrange(len(data_set)):
+			init_dist = distance(data_set[i], first_center)
+			for center in centers:
+				dist = distance(data_set[i], center)
+				if(dist<init_dist):
+					init_dist=dist
+					nearest_center=center
+			d[i]=init_dist*init_dist
+			cumsum=cumsum+d[i]
+			p_range[i]=cumsum
+		# normalizing the probability range for each point
+		for i in xrange(len(data_set)):
+			p_range[i]=p_range[i]/cumsum
+		# generate a random number between in range [0, 1]
+		U = random.random()
+		center_found = False
+		i=0
+		while((i<len(data_set)) and (center_found==False)):
+			if(U<=p_range[i]):
+				next_center = data_set[i]
+				center_found = True
+			i=i+1
+		centers.append(next_center)
+   
+    return centers
+
+
+    
+# reading the data
+def read_data(filename, skip_first_line = False, ignore_last_column = False):
+    '''
+    Loads data from a csv file and returns the corresponding list.
+    Data are expected to be floats, except for the first column.
+    
+    @param filename: csv file name.
+    
+    @param skip_first_line: if True, the first line is not read.
+        Default value: False.
+    
+    @param ignore_first_column: if True, the first column is ignored.
+        Default value: False.
+    
+    @return: a list of lists, each list being a row in the data file.
+        Rows are returned in the same order as in the file.
+        They contains floats, except for the 1st element which is a string
+        when the first column is not ignored.
+    '''
+    
+    f = open(filename,'r')
+    if skip_first_line:
+        f.readline()
+    
+    data = []
+    for line in f:
+        line = line.split(",")
+        if ignore_last_column:
+            line = line[:-1]
+        line = [ float(x) for x in line]
+        data.append(line)
+    f.close()
+    return data
+
+# writing the data on the drive
+def write_data(data, filename):
+    '''
+    Writes data on the drive
+	separation is made by a comma: ','
+    
+    args:
+        data: the data to be written
+        filename: name of the file where the data has to be written
+    '''
+
+    with open(filename,'w') as f:
+        i = 1
+        for item in data:
+	    # data will be indexed by: i = 1,2,...
+            f.write(str(i) + ',')
+            f.write(','.join(str(x) for x in item))
+            f.write('\n')
+            i+=1
+
+# generate random data for the tests
+def generate_data(n_observations, n_attributes, thershold):
+    ''' Generate random test data.
+    
+    args:
+        n_observations: number of observation
+        n_attributes: number of attributes
+        thershold: maximum generated value
+    '''
+    
+    return [[random.randint(0, thershold) for x in xrange(n_attributes)] for y in xrange(n_observations)]
+
+def k_means(dataset, k):
+    k_points = generate_k(dataset, k)
+    assignments = assign_points(dataset, k_points)
+    old_assignments = None
+    while assignments != old_assignments:
+        new_centers = update_centers(dataset, assignments)
+        old_assignments = assignments
+        assignments = assign_points(dataset, new_centers)
+    return zip(assignments, dataset)
