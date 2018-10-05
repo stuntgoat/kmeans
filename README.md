@@ -1,4 +1,4 @@
 kmeans
 ======
 
-K Means Clustering with Python
+K Means Clustering with Python.
