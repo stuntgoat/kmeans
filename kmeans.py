@@ -2,8 +2,6 @@ from collections import defaultdict
 from random import uniform
 from math import sqrt
 
-
-
 def point_avg(points):
     """
     Accepts a list of points, each with the same number of dimensions.
